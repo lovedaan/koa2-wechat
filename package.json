@@ -1,0 +1,19 @@
+{
+  "name": "node-wechat",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "nodemon ./app.js"
+  },
+  "dependencies": {
+    "jssha": "^2.3.1",
+    "koa": "^2.8.2",
+    "koa-body": "^4.1.1",
+    "koa-router": "^7.4.0",
+    "koa-static": "^5.0.0",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4",
+    "sha1": "^1.1.1"
+  }
+}

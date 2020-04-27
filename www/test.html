@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
+  <title>测试</title>
+  <link rel="stylesheet" type="text/css" href="css/wangEditor.min.css" />
+  <script type="text/javascript" src="js/axios.min.js"></script>
+  <script type="text/javascript" src="js/wangEditor.min.js"></script>
+  <style type="text/css">
+    .box {
+      margin-bottom: 20px;
+    }
+    .btn {
+      width: 120px;
+      height: 50px;
+      text-align: center;
+      line-height: 50px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      color:  #000;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="editorDom" style="width: 800px;"></div>
+    <div class="box"><button class="btn" id="getBtn">get请求</button></div>
+    <div class="box"><button class="btn" id="postBtn">post请求</button></div>
+    <div class="box"><button class="btn" id="editorBtn">编辑器内容</button></div>
+    <div class="box"><input type="file" name="" id="upFile" /> 请选择文件</div>
+  </div>
+  <script type="text/javascript">
+    let getBtn = document.querySelector('#getBtn');
+    let postBtn = document.querySelector('#postBtn');
+    let upFile = document.querySelector('#upFile');
+    let editorBtn = document.querySelector('#editorBtn');
+
+    const E = window.wangEditor
+    const editor = new E('#editorDom')
+    editor.customConfig.uploadFileName = 'fileName'
+    editor.customConfig.uploadImgServer = 'http://127.0.0.1:9000/api/test/upload'
+    editor.create()
+
+    const arr = [{id: 3, value: '福建'}, {id: 1, value: '广东'}, {id: 2, value: '湖南'}];
+
+    const res = arr.reduce((temp, cur, index) => {
+      console.log(index)
+      if(temp.id === 2) {
+        return temp;
+      }
+      return cur;
+    })
+    console.log(res)
+
+    const instance = axios.create({
+      timeout: 1000
+    });
+
+
+    editorBtn.addEventListener('click', () => {
+      console.log(editor.txt.html())
+    })
+
+
+    getBtn.addEventListener('click', () => {
+      instance.get('http://127.0.0.1:9000/api/test/list', {
+        params: {
+          name: '李四',
+          age: 25
+        }
+      }).then(res => {
+        console.log(res)
+      });
+    });
+    postBtn.addEventListener('click', () => {
+      instance.post('http://127.0.0.1:9000/api/test/login', {
+        data: {
+          name: '张三',
+          age: 111
+        }
+      }).then(res => {
+        console.log(res)
+      });
+    });
+    upFile.addEventListener('change', (e) => {
+      let formData = new FormData()
+      formData.append('fileName', e.target.files[0]);
+      formData.append('name', '张三');
+      formData.append('age', '111');
+      instance.post('http://127.0.0.1:9000/api/test/upload',formData).then(res => {
+        console.log(res)
+      }).catch(err => {
+        console.log(err)
+      });
+    })
+    // alert(editor.txt.text())
+  </script>
+</body>
+</html>

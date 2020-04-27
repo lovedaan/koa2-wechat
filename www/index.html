@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
+  <title>微信授权</title>
+  <script type="text/javascript" src="js/vue.min.js"></script>
+  <script type="text/javascript" src="js/vue-router.js"></script>
+  <script type="text/javascript" src="js/axios.min.js"></script>
+  <script type="text/javascript" src="js/jweixin-1.4.0.js"></script>
+  <link rel="stylesheet" type="text/css" href="css/weui.css" />
+  <style type="text/css">
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    html {
+      font-size: 13.333334vw;
+    }
+    body {
+      font-size: .24rem;
+    }
+    html, body, #app, .container, .main {
+      width: 100%;
+      height: 100%;
+    }
+    .main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .content {
+      flex: 1;
+      width: 100%;
+      overflow-y: auto;
+    }
+    .footer {
+      width: 100%;
+      height: 1rem;
+      display: flex;
+    }
+    .footer a {
+      flex: 1;
+      height: 1rem;
+      line-height: 1rem;
+      text-align: center;
+      font-size: 0.3rem;
+      text-decoration: none;
+      background-color: #f8f8f8;
+      color: #1f2d3d;
+    }
+    .footer a.active {
+      background-color: #20a0ff;
+      color: #fff;
+    }
+    .detail-title {
+      text-align: center;
+    }
+    .detail-con {
+      padding: 15px;
+    }
+    .detail-con .poster{
+      width: 100%;
+    }
+    .share-btn {
+      padding: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="container">
+      <router-view></router-view>
+    </div>
+  </div>
+  <script type="text/template" id="tpl-main">
+    <div class="main">
+      <div class="content">
+        <router-view></router-view>
+      </div>
+      <div class="footer">
+        <router-link to="/in_theaters">热映</router-link>
+        <router-link to="/top250">top250</router-link>
+        <router-link to="/user">个人中心</router-link>
+      </div>
+    </div>
+  </script>
+  <script type="text/template" id="tpl-theaters">
+    <div class="movie-wrap">
+      <button type="button" @click="getAddress">获取地址</button>
+      <div>
+        {{address}}
+      </div>
+      <div v-if="list.length" class="weui-panel weui-panel_access">
+          <div class="weui-panel__hd">{{title}}</div>
+          <div class="weui-panel__bd">
+              <router-link :to="'/detail/' + item.id"class="weui-media-box weui-media-box_appmsg" v-for="(item, index) of list" :key="item.id">
+                  <div class="weui-media-box__hd" @click="previewImage(item)">
+                      <img class="weui-media-box__thumb" :src="item.images.small" />
+                  </div>
+                  <div class="weui-media-box__bd">
+                      <h4 class="weui-media-box__title">{{item.title}}</h4>
+                      <p class="weui-media-box__desc">{{item.mainland_pubdate}}</p>
+                  </div>
+              </router-link>
+          </div>
+      </div>
+      <load-more :isMore="isMore" />
+    </div>
+  </script>
+  <script type="text/template" id="tpl-top">
+     <div class="movie-wrap">
+       <div v-if="list.length" class="weui-panel weui-panel_access">
+          <div class="weui-panel__hd">{{title}}</div>
+          <div class="weui-panel__bd">
+              <router-link :to="'/detail/' + item.id" class="weui-media-box weui-media-box_appmsg" v-for="(item, index) of list" :key="item.id">
+                  <div class="weui-media-box__hd" @click="previewImage(item)">
+                      <img class="weui-media-box__thumb" :src="item.images.small" />
+                  </div>
+                  <div class="weui-media-box__bd">
+                      <h4 class="weui-media-box__title">{{item.title}}</h4>
+                      <p class="weui-media-box__desc">{{item.mainland_pubdate}}</p>
+                  </div>
+              </router-link>
+          </div>
+      </div>
+      <load-more :isMore="isMore" />
+     </div>
+  </script>
+   <script type="text/template" id="tpl-detail">
+    <div class="detail">
+      <h1 class="detail-title">{{detailInfo.title}}</h1>
+      <div class="detail-con">
+        <img class="poster" :src="detailInfo.images && detailInfo.images.large" />
+        <p>{{detailInfo.summary}}</p>
+      </div>
+      <!-- <div class="share-btn">
+        <a href="javascript:;" class="weui-btn weui-btn_primary" @click="doShare">分享</a>
+      </div> -->
+    </div>
+  </script>
+  <script type="text/template" id="tpl-user">
+    <div class="user-page">
+      <img :src="headimgurl" alt="">
+      <p>{{nickname}}</p>
+    </div>
+  </script>
+  <script type="text/javascript">
+
+    function getMovieData(type) {
+      return axios.get('/movie', {
+        params: {
+          type
+        }
+      })
+    }
+    function initSKD(dataOpt) {
+      const url = window.location.origin + window.location.pathname + 'index.html';
+      axios.get('/wechat-jssdk', {
+        params: {
+          url: encodeURIComponent(url)
+        }
+      }).then(res => {
+        let data = res.data.data;
+        wx.config({
+          debug: true, // 开启调试模式,调用的所有api的返回值会在客户端alert出来，若要查看传入的参数，可以在pc端打开，参数信息会通过log打出，仅在pc端时才会打印。
+          appId: data.appId, // 必填，公众号的唯一标识
+          timestamp: data.timestamp, // 必填，生成签名的时间戳
+          nonceStr: data.noncestr, // 必填，生成签名的随机串
+          signature: data.signature,// 必填，签名
+          jsApiList: ['getNetworkType', 'getLocation', 'scanQRCode', 'previewImage'] // 必填，需要使用的JS接口列表
+        });
+        wx.ready(function () {
+           /*let params = {
+             title: '不知道说什么',
+             desc: '这是测试自定义分享到朋友',
+             link: window.location.href,
+             imgUrl: 'https://images.jxsg.com/seckill_hot_img/2019/10/4938afe869fc7c94f21d2593fecb9d56.png',
+             success: function () {
+              alert('分享到朋友成功');
+             }
+           };
+           wx.updateAppMessageShareData(params);
+           wx.updateTimelineShareData(params);*/
+           alert(123);
+        });
+      }).catch(err => {
+        console.log(err)
+      })
+    };
+
+
+    Vue.component('load-more', {
+      props: {
+        isMore: {
+          type: Boolean,
+          default: true
+        }
+      },
+      template: `
+        <div class="loadmore">
+            <div class="weui-loadmore" v-if="isMore">
+                <i class="weui-loading"></i>
+                <span class="weui-loadmore__tips">正在加载</span>
+            </div>
+            <div class="weui-loadmore weui-loadmore_line" v-else>
+                <span class="weui-loadmore__tips">没有更多数据了</span>
+            </div>
+        </div>
+      `
+    });
+
+    const HotMovie = {
+      template: '#tpl-theaters',
+      data() {
+        return {
+          list: [],
+          title: '',
+          isMore: true,
+          address: '',
+        }
+      },
+      mounted() {
+        this.isMore = true;
+        getMovieData('in_theaters').then(res => {
+          console.log(res.data);
+          this.list = res.data.data.subjects;
+          this.title = res.data.data.title;
+          this.isMore = false;
+        })
+      },
+      methods: {
+        getAddress() {
+          const that = this;
+          wx.openAddress({
+            success: function (res) {
+              that.address = res;
+              var userName = res.userName; // 收货人姓名
+              var postalCode = res.postalCode; // 邮编
+              var provinceName = res.provinceName; // 国标收货地址第一级地址（省）
+              var cityName = res.cityName; // 国标收货地址第二级地址（市）
+              var countryName = res.countryName; // 国标收货地址第三级地址（国家）
+              var detailInfo = res.detailInfo; // 详细收货地址信息
+              var nationalCode = res.nationalCode; // 收货地址国家码
+              var telNumber = res.telNumber; // 收货人手机号码
+            }
+          });
+        },
+        previewImage(item) {
+          const imgs = this.list.map(item => item.images.large);
+          wx.previewImage({
+            current: item.images.large, // 当前显示图片的http链接
+            urls: imgs // 需要预览的图片http链接列表
+          });
+        }
+      }
+    };
+    const TopMovie = {
+      template: '#tpl-top',
+      data() {
+        return {
+          list: [],
+          title: '',
+          isMore: true
+        }
+      },
+      mounted() {
+        this.isMore = true;
+        getMovieData('top250').then(res => {
+          this.list = res.data.data.subjects;
+          this.title = res.data.data.title;
+          this.isMore = false;
+        })
+      },
+      methods: {
+        previewImage(item) {
+          const imgs = this.list.map(item => item.images.large);
+          wx.previewImage({
+            current: item.images.large, // 当前显示图片的http链接
+            urls: imgs // 需要预览的图片http链接列表
+          });
+        }
+      }
+    };
+    const User = {
+      template: '#tpl-user',
+    };
+
+    const Main = {
+      template: '#tpl-main',
+    };
+
+    const Detail = {
+      template: '#tpl-detail',
+      data() {
+        return {
+          id: this.$route.params.id,
+          detailInfo: {}
+        }
+      },
+      mounted() {
+        axios.get('/detail', {
+          params: {
+            id: this.id
+          }
+        }).then(res => {
+          this.detailInfo = res.data.data;
+          initSKD(this.detailInfo);
+        })
+      },
+      methods: {
+        doShare() {
+
+        }
+      }
+    };
+
+
+    const router = new VueRouter({
+      linkActiveClass: 'active',
+      routes: [
+        {
+          path: '/',
+          component: Main,
+          children: [
+            {
+              path: 'in_theaters',
+              component: HotMovie
+            },
+            {
+              path: 'top250',
+              component: TopMovie
+            },
+            {
+              path: 'user',
+              component: User
+            },
+          ]
+        },
+        {
+          path: '/detail/:id',
+          component: Detail
+        },
+        {
+          path: '*',
+          redirect: '/in_theaters'
+        }
+      ]
+    });
+
+
+    new Vue({
+      el: '#app',
+      router,
+      data: {
+        msg: 'hello',
+        headimgurl: '',
+        nickname: '',
+      },
+      mounted() {
+        this.getUserInfo();
+        this.initSKD();
+      },
+      methods: {
+        getUserInfo() {
+          const code = this.getUrlParam('code');
+          axios.get('/wechat-userInfo', {
+            params: {
+              code
+            }
+          }).then(res => {
+            console.log(res.data)
+            this.headimgurl = res.data.headimgurl;
+            this.nickname = res.data.nickname;
+          }).catch(err => {
+            console.log(err)
+          })
+        },
+        initSKD(callback) {
+          const url = window.location.origin + window.location.pathname + 'index.html';
+          axios.get('/wechat-jssdk', {
+            params: {
+              url: encodeURIComponent(url)
+            }
+          }).then(res => {
+            console.log(res.data)
+            let data = res.data;
+            wx.config({
+              debug: true, // 开启调试模式,调用的所有api的返回值会在客户端alert出来，若要查看传入的参数，可以在pc端打开，参数信息会通过log打出，仅在pc端时才会打印。
+              appId: data.appId, // 必填，公众号的唯一标识
+              timestamp: data.timestamp, // 必填，生成签名的时间戳
+              nonceStr: data.noncestr, // 必填，生成签名的随机串
+              signature: data.signature,// 必填，签名
+              jsApiList: ['getNetworkType', 'getLocation', 'scanQRCode', 'previewImage', 'updateAppMessageShareData', 'updateTimelineShareData', 'openAddress'] // 必填，需要使用的JS接口列表
+            });
+            wx.ready(function () {
+              callback && callback();
+            });
+          }).catch(err => {
+            console.log(err)
+          })
+        },
+        initWxShare(data) {
+          this.initSKD(function () {
+            wx.updateAppMessageShareData({
+              title: data.title, // 分享标题
+              desc: '这是测试自定义分享到朋友', // 分享描述
+              link: window.location.href, // 分享链接，该链接域名或路径必须与当前页面对应的公众号JS安全域名一致
+              imgUrl: data.images.large, // 分享图标
+              success: function () {
+                alert('分享到朋友成功');
+              }
+            });
+            wx.updateTimelineShareData({
+              title: data.title, // 分享标题
+              link: window.location.href, // 分享链接，该链接域名或路径必须与当前页面对应的公众号JS安全域名一致
+              imgUrl: data.images.large, // 分享图标
+              success: function () {
+                alert('分享到朋友圈成功');
+              }
+            })
+          });
+        },
+        getUrlParam(name){
+            var reg = new RegExp("(^|&)"+ name +"=([^&]*)(&|$)");
+            var r = window.location.search.substr(1).match(reg);
+            if (r!=null) return unescape(r[2]); return null;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
